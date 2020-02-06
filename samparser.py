@@ -3641,7 +3641,7 @@ if __name__ == "__main__":
                         outf.write(i)
             else:
                 for i in source_func():
-                    sys.stdout.buffer.write(i.decode("utf-8"))
+                    sys.stdout.buffer.write(i)
         else:
             if output_file:
                 os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -3650,7 +3650,7 @@ if __name__ == "__main__":
                         outf.write(i)
             else:
                 for i in source_func():
-                    sys.stdout.buffer.write(i)
+                    sys.stdout.buffer.write(i.encode())
 
         return output_file
 

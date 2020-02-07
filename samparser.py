@@ -1467,7 +1467,11 @@ class Record(Block):
 
     def serialize_html(self, duplicate=False, variables=[]):
         if not self.preceding_sibling():
-            yield b'<thead class="recordset-header">\n<tr class="recordset-header-row">\n'
+            caption = ""
+            table_name = getattr(self.parent, "name")
+            if table_name is not None:
+                caption = '<caption class="recordset-caption" data-name="{0}"></caption>\n'.format(escape_for_xml_attribute(table_name))
+            yield '{0}<thead class="recordset-header">\n<tr class="recordset-header-row">\n'.format(caption).encode('utf-8')
             for fn in self.parent.field_names:
                 yield '<th class ="recordset-field" data-field-name="{0}"></th >\n'.format(fn).encode('utf-8')
             yield b'</tr>\n</thead>\n<tbody class="recordset-body">\n'

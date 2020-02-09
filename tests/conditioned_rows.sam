@@ -1,0 +1,13 @@
+cookbook: This is the great cookbook
+    introduction:
+        Some random text
+
+    recipe::, ingredient, amount, unit
+        , coffee, 50, grams
+        ,(?vegan=no) milk, 70, ml
+        ,(?vegan=yes)(?fancy=super) oat-milk, 50, ml
+        ,(?vegan=yes) soy-milk, 50, ml
+        , water, 100, ml
+    measurements::(?needed=true)(?super=duper)source, destination, ratio
+        cup, ml, 236
+        tbsp, ml, 15

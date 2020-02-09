@@ -66,7 +66,8 @@ block_patterns = {
             'block-insert': re.compile(re_indent + r'>>>((\((?P<insert>.+?)\))|(\[(?P<ref>.*?(?<!\\))\]))'
                                                    r'(' + re_attributes + ')?\s*(?P<unexpected>.*)', re.U),
             'include': re.compile(re_indent + r'<<<' + re_attributes, re.U),
-            'variable-def': re.compile(re_indent + r'\$' + re_name + '\s*=\s*' + re_content, re.U)
+            'variable-def': re.compile(re_indent + r'\$' + re_name + '\s*=\s*' + re_content, re.U),
+            'conditional-row': re.compile(re_attributes + re_spaces + re_content)
         }
 
 
@@ -1415,7 +1416,11 @@ class RecordSet(Block):
     def __init__(self, block_type, field_names, indent, attributes={}, citations=[], namespace=None):
         super().__init__(block_type=block_type, indent=indent, attributes=attributes,
                          citations=citations, namespace=namespace)
-        self.field_names = field_names
+        self.has_condition = field_names[0] == ''
+        if self.has_condition:
+            self.field_names = field_names[1:]
+        else:
+            self.field_names = field_names
 
     def __str__(self):
         return ''.join(self.regurgitate())
@@ -1423,6 +1428,8 @@ class RecordSet(Block):
     def regurgitate(self):
         yield '{0}{1}::'.format(" " * int(self.indent), self.block_type)
         yield from self._regurgitate_attributes(self._attribute_regurgitation)
+        if self.has_condition:
+            yield ', '
         yield '{0}\n'.format(', '.join(self.field_names))
         for x in self.children:
             yield from x.regurgitate()
@@ -1431,21 +1438,42 @@ class RecordSet(Block):
     def add(self, b):
         if b.indent <= self.indent:
             self.parent.add(b)
-        elif not type(b) is Record:
+            return
+
+        if not type(b) is Record:
             raise SAMParserStructureError('A RecordSet can only have Record children.')
-        elif len(b.field_values) != len(self.field_names):
+
+        if self.has_condition:
+            first_field = b.field_values[0]
+            if len(first_field.children) != 0:
+                raise SAMParserStructureError('First value in a conditional record set field is not empty')
+            b.field_values = b.field_values[1:]
+            # extract condition from the first field
+            if len(b.field_values[0].children) == 1:
+                match = block_patterns['conditional-row'].match(b.field_values[0].children[0])
+                if match:
+                    attributes, citations = parse_attributes(match.group("attributes"))
+                    #print(">> {}: {}".format(attributes, match.group("content")))
+                    b.conditions = attributes["conditions"]
+                    b.field_values[0].children[0] = match.group("content")
+
+        if len(b.field_values) != len(self.field_names):
             raise SAMParserStructureError('Record length does not match record set header.')
         else:
             b.parent = self
             self.children.append(b)
 
 class Record(Block):
-    _attribute_serialization_xml = [('namespace', 'xmlns')]
+    _attribute_serialization_xml = [('conditions', 'conditions'),
+            ('namespace', 'xmlns')]
 
-    _attribute_serialization_html = []
+    _attribute_serialization_html = [('conditions', 'conditions')]
+
+    _attribute_regurgitation = [('conditions', '?')]
 
     def __init__(self, field_values, indent, namespace=None):
         super().__init__(block_type='record', indent=indent, attributes={}, citations=[], namespace=namespace)
+        self.conditions = []
         self.field_values = field_values
 
     def __str__(self):
@@ -1453,6 +1481,10 @@ class Record(Block):
 
     def regurgitate(self):
         yield " " * int(self.indent)
+        if self.parent.has_condition:
+            yield ','
+            yield from self._regurgitate_attributes(self._attribute_regurgitation)
+            yield ' '
         yield ', '.join([''.join(x.regurgitate()).replace(',', '\\,') for x in self.field_values]) + '\n'
 
     def serialize_xml(self):
